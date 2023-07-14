@@ -56,7 +56,7 @@ namespace CheapPlayitasApi
         public static async Task<List<TravelPrice>> GetHotelsAndPrices(HttpClient httpClient, int persons)
         {
             // var airports = new List<string>() { "AAL" };
-            var airports = new List<string>() { "CPH", "BLL", "AAL", "AAR" };
+            var airports = new List<string>() { "CPH", "BLL", "AAL" };
             // var durations = new List<string>() { "7"};
             var durations = new List<string>() { "7", "14", "21"};
             // var hotels = GetHotelList().SkipLast(6).ToList();
