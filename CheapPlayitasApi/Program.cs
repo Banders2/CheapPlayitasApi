@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Caching.Memory;
 using System.Diagnostics;
 using System.Net;
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Unicode;
 
 namespace CheapPlayitasApi
 {
@@ -59,7 +61,7 @@ namespace CheapPlayitasApi
             var airports = new List<string>() { "CPH", "BLL", "AAL" };
             // var durations = new List<string>() { "7"};
             var durations = new List<string>() { "7", "14", "21"};
-            // var hotels = GetHotelList().SkipLast(6).ToList();
+            //var hotels = GetHotelList().Skip(3).SkipLast(3).ToList();
             var hotels = GetHotelList();
             var prices = await GetPricesAsync(httpClient, durations, hotels, airports, persons);
 
@@ -152,10 +154,10 @@ namespace CheapPlayitasApi
                 new Hotel("PlayitasAnnexe", "Playitas Annexe (Fuerteventura - Spanien)", "530116", "spanien/de-kanariske-oer/fuerteventura/playitas-resort/hoteller/playitas-annexe"),
                 new Hotel("PlayitasResort", "Playitas Resort (Fuerteventura - Spanien)", "160759", "spanien/de-kanariske-oer/fuerteventura/playitas-resort/hoteller/playitas-resort"),
                 new Hotel("LaPared", "La Pared (Fuerteventura - Spanien)", "537065", "spanien/de-kanariske-oer/fuerteventura/costa-calma-tarajalejo-og-la-pared/hoteller/la-pared---powered-by-playitas"),
-                new Hotel("PortoMyrina", "Porto Myrina (Limnos - Gr�kenland)", "158862", "graekenland/limnos/hoteller/porto-myrina---powered-by-playitas"),
-                new Hotel("Levante", "Levante (Rhodos - Gr�kenland)", "165291", "graekenland/rhodos/afandou-og-kolymbia/hoteller/levante---powered-by-playitas"),
-                new Hotel("SivotaRetreat", "Sivota Retreat (Gr�kenland)", "544616", "graekenland/sivota/hoteller/sivota-retreat---powered-by-playitas"),
-                new Hotel("CavoSpada", "Cavo Spada Deluxe & Spa Giannoulis (Kreta - Gr�kenland)", "542262", "graekenland/kreta/kolymbari/hoteller/cavo-spada-deluxe-og-spa-giannoulis-hotels"),
+                new Hotel("PortoMyrina", "Porto Myrina (Limnos - Grækenland)", "158862", "graekenland/limnos/hoteller/porto-myrina---powered-by-playitas"),
+                new Hotel("Levante", "Levante (Rhodos - Grækenland)", "165291", "graekenland/rhodos/afandou-og-kolymbia/hoteller/levante---powered-by-playitas"),
+                new Hotel("SivotaRetreat", "Sivota Retreat (Grækenland)", "544616", "graekenland/sivota/hoteller/sivota-retreat---powered-by-playitas"),
+                new Hotel("CavoSpada", "Cavo Spada Deluxe & Spa Giannoulis (Kreta - Grækenland)", "542262", "graekenland/kreta/kolymbari/hoteller/cavo-spada-deluxe-og-spa-giannoulis-hotels"),
                 new Hotel("AquaVista", "Aqua Vista (Egypten)", "548420", "egypten/hurghada/hoteller/aqua-vista---powered-by-playitas"),
                 new Hotel("VidamarResorts", "Vidamar Resorts (Madeira - Portugal)", "496953", "portugal/madeira/funchal/hoteller/vidamar-resorts-madeira---vinter")
             };
