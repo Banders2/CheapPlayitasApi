@@ -41,7 +41,7 @@ namespace CheapPlayitasApi
 
                 var prices = cache.GetOrCreate("PricesCache", async entry =>
                 {
-                    entry.SetAbsoluteExpiration(TimeSpan.FromHours(1));
+                    entry.SetAbsoluteExpiration(TimeSpan.FromHours(20));
                     var persons = context.Request.Query.TryGetValue("persons", out var personsValue) ? int.Parse(personsValue) : 2;
                     return await GetHotelsAndPrices(httpClient, persons);
                 });
@@ -57,11 +57,11 @@ namespace CheapPlayitasApi
 
         public static async Task<List<TravelPrice>> GetHotelsAndPrices(HttpClient httpClient, int persons)
         {
-            // var airports = new List<string>() { "AAL" };
+            //var airports = new List<string>() { "CPH" };
             var airports = new List<string>() { "CPH", "BLL", "AAL" };
-            // var durations = new List<string>() { "7"};
-            var durations = new List<string>() { "7", "14", "21"};
-            //var hotels = GetHotelList().Skip(3).SkipLast(3).ToList();
+            //var durations = new List<string>() { "21" };
+            var durations = new List<string>() { "7", "14", "21" };
+            //var hotels = GetHotelList().SkipLast(8).ToList();
             var hotels = GetHotelList();
             var prices = await GetPricesAsync(httpClient, durations, hotels, airports, persons);
 
@@ -103,7 +103,7 @@ namespace CheapPlayitasApi
                 var data = await response.Content.ReadFromJsonAsync<List<TravelPriceDto>>();
                 if (data != null && data.Count > 0)
                 {
-                    return data
+                    var travels = data
                         .Where(d => !d.IsSoldOut && d.CheapestPrice != null)
                         .Select(travelPriceDto => new TravelPrice(
                             travelPriceDto.Date,
@@ -113,9 +113,36 @@ namespace CheapPlayitasApi
                             hotel.DisplayName,
                             HotelLink(hotel.HotelUrl, travelPriceDto.Date, airport, travelDuration, hotel.HotelId, paxAges)))
                         .ToList();
+                    if(travelDuration != "21") { return travels; }
+
+                    // Figure out of travels are 21 or 28 days. This should be optimized!
+                    var travelsAt21Days = travels.Where(x => x.Duration == "21").ToList();
+                    travels.Clear(); // Remove existing travels, since they are either 21, 28 or both.
+                    foreach (var travel in travelsAt21Days)
+                    {
+                        var flightsUrl = $"https://www.apollorejser.dk/api/Flight/Flights?productCategoryCode=FlightAndHotel&DepartureAirportCode={airport}&DepartureDate={travel.Date:yyyy-MM-dd}&duration=21&HotelId={hotel.HotelIdString}&PaxAges={paxAges}";
+                        var flightsResponse = await httpClient.GetAsync(flightsUrl);
+                        var flightsData = await flightsResponse.Content.ReadFromJsonAsync<FLights>();
+                        if (flightsData != null && flightsData.FlightPackages.Count > 0)
+                        {
+                            foreach (var flight in flightsData.FlightPackages)
+                            {
+                                travels.Add(
+                                    new TravelPrice(
+                                        travel.Date,
+                                        flight.CheapestProductPrice,
+                                        airport,
+                                        flight.DurationInDays.ToString(),
+                                        hotel.DisplayName,
+                                        HotelLink(hotel.HotelUrl, travel.Date, airport, travelDuration, hotel.HotelId, paxAges)
+                                    )
+                                );
+                            }
+                        }
+                    }
+                    return travels;
                 }
             }
-
             return new List<TravelPrice>();
         }
 
@@ -151,15 +178,15 @@ namespace CheapPlayitasApi
         {
             var hotels = new List<Hotel>
             {
-                new Hotel("PlayitasAnnexe", "Playitas Annexe (Fuerteventura - Spanien)", "530116", "spanien/de-kanariske-oer/fuerteventura/playitas-resort/hoteller/playitas-annexe"),
-                new Hotel("PlayitasResort", "Playitas Resort (Fuerteventura - Spanien)", "160759", "spanien/de-kanariske-oer/fuerteventura/playitas-resort/hoteller/playitas-resort"),
-                new Hotel("LaPared", "La Pared (Fuerteventura - Spanien)", "537065", "spanien/de-kanariske-oer/fuerteventura/costa-calma-tarajalejo-og-la-pared/hoteller/la-pared---powered-by-playitas"),
-                new Hotel("PortoMyrina", "Porto Myrina (Limnos - Grækenland)", "158862", "graekenland/limnos/hoteller/porto-myrina---powered-by-playitas"),
-                new Hotel("Levante", "Levante (Rhodos - Grækenland)", "165291", "graekenland/rhodos/afandou-og-kolymbia/hoteller/levante---powered-by-playitas"),
-                new Hotel("SivotaRetreat", "Sivota Retreat (Grækenland)", "544616", "graekenland/sivota/hoteller/sivota-retreat---powered-by-playitas"),
-                new Hotel("CavoSpada", "Cavo Spada Deluxe & Spa Giannoulis (Kreta - Grækenland)", "542262", "graekenland/kreta/kolymbari/hoteller/cavo-spada-deluxe-og-spa-giannoulis-hotels"),
-                new Hotel("AquaVista", "Aqua Vista (Egypten)", "548420", "egypten/hurghada/hoteller/aqua-vista---powered-by-playitas"),
-                new Hotel("VidamarResorts", "Vidamar Resorts (Madeira - Portugal)", "496953", "portugal/madeira/funchal/hoteller/vidamar-resorts-madeira---vinter")
+                new Hotel("Playitas Annexe (Fuerteventura - Spanien)", "530116", "PLXPLA", "spanien/de-kanariske-oer/fuerteventura/playitas-resort/hoteller/playitas-annexe"),
+                new Hotel("Playitas Resort (Fuerteventura - Spanien)", "160759", "PLYBAH", "spanien/de-kanariske-oer/fuerteventura/playitas-resort/hoteller/playitas-resort"),
+                new Hotel("La Pared (Fuerteventura - Spanien)", "537065", "COSLAP", "spanien/de-kanariske-oer/fuerteventura/costa-calma-tarajalejo-og-la-pared/hoteller/la-pared---powered-by-playitas"),
+                new Hotel("Porto Myrina (Limnos - Grækenland)", "158862", "MYNPPB", "graekenland/limnos/hoteller/porto-myrina---powered-by-playitas"),
+                new Hotel("Levante (Rhodos - Grækenland)", "165291", "AFNLEV", "graekenland/rhodos/afandou-og-kolymbia/hoteller/levante---powered-by-playitas"),
+                new Hotel("Sivota Retreat (Grækenland)", "544616", "SIVNEI", "graekenland/sivota/hoteller/sivota-retreat---powered-by-playitas"),
+                new Hotel("Cavo Spada Deluxe & Spa Giannoulis (Kreta - Grækenland)", "542262", "KLYGCS", "graekenland/kreta/kolymbari/hoteller/cavo-spada-deluxe-og-spa-giannoulis-hotels"),
+                new Hotel("Aqua Vista (Egypten)", "548420", "HURAQV", "egypten/hurghada/hoteller/aqua-vista---powered-by-playitas"),
+                new Hotel("Vidamar Resorts (Madeira - Portugal)", "1204396", "MAEVID", "portugal/madeira/funchal/hoteller/vidamar-resorts-madeira---vinter")
             };
 
             return hotels;
@@ -167,7 +194,19 @@ namespace CheapPlayitasApi
     }
     public record TravelPriceDto(DateTime Date, bool IsSoldOut, decimal? CheapestPrice);
 
-    public record Hotel(string ShortName, string DisplayName, string HotelId, string HotelUrl);
+    public record Hotel(string DisplayName, string HotelId, string HotelIdString, string HotelUrl);
 
     public record TravelPrice(DateTime Date, decimal? Price, string Airport, string Duration, string Hotel, string Link);
+
+
+    public record FlightPackage
+    {
+        public int DurationInDays { get; init; }
+        public decimal CheapestProductPrice { get; init; }
+    }
+
+    public record FLights
+    {
+        public List<FlightPackage> FlightPackages { get; init; }
+    }
 }
