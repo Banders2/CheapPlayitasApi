@@ -57,12 +57,12 @@ namespace CheapPlayitasApi
 
         public static async Task<List<TravelPrice>> GetHotelsAndPrices(HttpClient httpClient, int persons)
         {
-            //var airports = new List<string>() { "CPH" };
-            var airports = new List<string>() { "CPH", "BLL", "AAL" };
-            //var durations = new List<string>() { "21" };
-            var durations = new List<string>() { "7", "14", "21" };
-            //var hotels = GetHotelList().SkipLast(8).ToList();
-            var hotels = GetHotelList();
+            var airports = new List<string>() { "CPH" };
+            //var airports = new List<string>() { "CPH", "BLL", "AAL" };
+            var durations = new List<string>() { "21" };
+            //var durations = new List<string>() { "7", "14", "21" };
+            var hotels = GetHotelList().SkipLast(8).ToList();
+            //var hotels = GetHotelList();
             var prices = await GetPricesAsync(httpClient, durations, hotels, airports, persons);
 
             return prices;
@@ -180,13 +180,13 @@ namespace CheapPlayitasApi
             {
                 new Hotel("Playitas Annexe (Fuerteventura - Spanien)", "530116", "PLXPLA", "spanien/de-kanariske-oer/fuerteventura/playitas-resort/hoteller/playitas-annexe"),
                 new Hotel("Playitas Resort (Fuerteventura - Spanien)", "160759", "PLYBAH", "spanien/de-kanariske-oer/fuerteventura/playitas-resort/hoteller/playitas-resort"),
-                new Hotel("La Pared (Fuerteventura - Spanien)", "537065", "COSLAP", "spanien/de-kanariske-oer/fuerteventura/costa-calma-tarajalejo-og-la-pared/hoteller/la-pared---powered-by-playitas"),
-                new Hotel("Porto Myrina (Limnos - Grækenland)", "158862", "MYNPPB", "graekenland/limnos/hoteller/porto-myrina---powered-by-playitas"),
-                new Hotel("Levante (Rhodos - Grækenland)", "165291", "AFNLEV", "graekenland/rhodos/afandou-og-kolymbia/hoteller/levante---powered-by-playitas"),
-                new Hotel("Sivota Retreat (Grækenland)", "544616", "SIVNEI", "graekenland/sivota/hoteller/sivota-retreat---powered-by-playitas"),
-                new Hotel("Cavo Spada Deluxe & Spa Giannoulis (Kreta - Grækenland)", "542262", "KLYGCS", "graekenland/kreta/kolymbari/hoteller/cavo-spada-deluxe-og-spa-giannoulis-hotels"),
-                new Hotel("Aqua Vista (Egypten)", "548420", "HURAQV", "egypten/hurghada/hoteller/aqua-vista---powered-by-playitas"),
-                new Hotel("Vidamar Resorts (Madeira - Portugal)", "1204396", "MAEVID", "portugal/madeira/funchal/hoteller/vidamar-resorts-madeira---vinter")
+                //new Hotel("La Pared (Fuerteventura - Spanien)", "537065", "COSLAP", "spanien/de-kanariske-oer/fuerteventura/costa-calma-tarajalejo-og-la-pared/hoteller/la-pared---powered-by-playitas"),
+                //new Hotel("Porto Myrina (Limnos - Grækenland)", "158862", "MYNPPB", "graekenland/limnos/hoteller/porto-myrina---powered-by-playitas"),
+                //new Hotel("Levante (Rhodos - Grækenland)", "165291", "AFNLEV", "graekenland/rhodos/afandou-og-kolymbia/hoteller/levante---powered-by-playitas"),
+                //new Hotel("Sivota Retreat (Grækenland)", "544616", "SIVNEI", "graekenland/sivota/hoteller/sivota-retreat---powered-by-playitas"),
+                //new Hotel("Cavo Spada Deluxe & Spa Giannoulis (Kreta - Grækenland)", "542262", "KLYGCS", "graekenland/kreta/kolymbari/hoteller/cavo-spada-deluxe-og-spa-giannoulis-hotels"),
+                //new Hotel("Aqua Vista (Egypten)", "548420", "HURAQV", "egypten/hurghada/hoteller/aqua-vista---powered-by-playitas"),
+                //new Hotel("Vidamar Resorts (Madeira - Portugal)", "1204396", "MAEVID", "portugal/madeira/funchal/hoteller/vidamar-resorts-madeira---vinter")
             };
 
             return hotels;
