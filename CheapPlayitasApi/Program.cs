@@ -1,9 +1,5 @@
 using Microsoft.Extensions.Caching.Memory;
-using System.Diagnostics;
 using System.Net;
-using System.Text.Encodings.Web;
-using System.Text.Json;
-using System.Text.Unicode;
 
 namespace CheapPlayitasApi
 {
@@ -41,9 +37,20 @@ namespace CheapPlayitasApi
 
                 var prices = cache.GetOrCreate("PricesCache", async entry =>
                 {
-                    entry.SetAbsoluteExpiration(TimeSpan.FromHours(20));
-                    var persons = context.Request.Query.TryGetValue("persons", out var personsValue) ? int.Parse(personsValue) : 2;
-                    return await GetHotelsAndPrices(httpClient, persons);
+                    try
+                    {
+                        entry.SetAbsoluteExpiration(TimeSpan.FromHours(20));
+                        var persons = context.Request.Query.TryGetValue("persons", out var personsValue) ? int.Parse(personsValue) : 2;
+                        var travelPrices = await GetHotelsAndPrices(httpClient, persons);
+                        return travelPrices;
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine($"Failed to get cache - {e.Message}");
+                        cache.Remove("PricesCache");
+                        throw;
+                    }
+
                 });
                 var res = await prices;
                 Console.WriteLine($"Finishing request to prices {DateTime.Now}");
@@ -57,12 +64,12 @@ namespace CheapPlayitasApi
 
         public static async Task<List<TravelPrice>> GetHotelsAndPrices(HttpClient httpClient, int persons)
         {
-            var airports = new List<string>() { "CPH" };
-            //var airports = new List<string>() { "CPH", "BLL", "AAL" };
-            var durations = new List<string>() { "21" };
-            //var durations = new List<string>() { "7", "14", "21" };
-            var hotels = GetHotelList().SkipLast(8).ToList();
-            //var hotels = GetHotelList();
+            //var airports = new List<string>() { "BLL" };
+            var airports = new List<string>() { "CPH", "BLL", "AAL" };
+            //var durations = new List<string>() { "21" };
+            var durations = new List<string>() { "7", "14", "21" };
+            //var hotels = GetHotelList().SkipLast(7).ToList();
+            var hotels = GetHotelList();
             var prices = await GetPricesAsync(httpClient, durations, hotels, airports, persons);
 
             return prices;
