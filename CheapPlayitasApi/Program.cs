@@ -53,6 +53,7 @@ namespace CheapPlayitasApi
 
                 });
                 var res = await prices;
+                if(res.Count == 0) cache.Remove("PricesCache");
                 Console.WriteLine($"Finishing request to prices {DateTime.Now}");
                 return res;
             });
