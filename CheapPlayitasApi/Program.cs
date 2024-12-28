@@ -35,25 +35,26 @@ namespace CheapPlayitasApi
             {
                 Console.WriteLine($"Starting request to prices {DateTime.Now}");
 
-                var prices = cache.GetOrCreate("PricesCache", async entry =>
+                var persons = context.Request.Query.TryGetValue("persons", out var personsValue) ? int.Parse(personsValue) : 2;
+                var cacheKey = $"PricesCache{persons}";
+                var prices = cache.GetOrCreate(cacheKey, async entry =>
                 {
                     try
                     {
                         entry.SetAbsoluteExpiration(TimeSpan.FromHours(20));
-                        var persons = context.Request.Query.TryGetValue("persons", out var personsValue) ? int.Parse(personsValue) : 2;
                         var travelPrices = await GetHotelsAndPrices(httpClient, persons);
                         return travelPrices;
                     }
                     catch (Exception e)
                     {
                         Console.WriteLine($"Failed to get cache - {e.Message}");
-                        cache.Remove("PricesCache");
+                        cache.Remove(cacheKey);
                         throw;
                     }
 
                 });
                 var res = await prices;
-                if(res.Count == 0) cache.Remove("PricesCache");
+                if(res.Count == 0) cache.Remove(cacheKey);
                 Console.WriteLine($"Finishing request to prices {DateTime.Now}");
                 return res;
             });
