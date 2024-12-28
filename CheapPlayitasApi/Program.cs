@@ -84,6 +84,12 @@ namespace CheapPlayitasApi
 
             var tasks = new List<Task<List<TravelPrice>>>();
             durations.ForEach(duration => airports.ForEach(airport => monthYearStrings.ForEach(monthYearString => tasks.Add(GetPricesForHotelAsync(httpClient, duration, hotels, airport, monthYearString, paxAges)))));
+
+            // tasks.Add(GetPricesForHotelAsync(httpClient, "7", hotels, "CPH", "2025-01", paxAges));
+            // tasks.Add(GetPricesForHotelAsync(httpClient, "14", hotels, "CPH", "2025-01", paxAges));
+            // tasks.Add(GetPricesForHotelAsync(httpClient, "21", hotels, "CPH", "2025-01", paxAges));
+
+            
             var results = await Task.WhenAll(tasks);
 
             foreach (var result in results)
@@ -103,19 +109,18 @@ namespace CheapPlayitasApi
 
         public static async Task<List<TravelPrice>> GetPricesForHotelAndAirportAsync(HttpClient httpClient, string travelDuration, Hotel hotel, string airport, string monthYearString, string paxAges)
         {
-            var url = $"https://www.apollorejser.dk/PriceCalendar/Calendar?ProductCategoryCode=FlightAndHotel&DepartureDate={monthYearString}-01&departureAirportCode={airport}&duration={travelDuration}&catalogueItemId={hotel.HotelId}&departureDateRange=31&paxAges={paxAges}";
-
+            var url = $"https://prod-bookingguide.apollotravelgroup.com/api/2.0/apollorejserdk/SearchBox/DepartureDates?productTypeCodes=FlightAndHotel&accommodationCode=ESPLYBAH01&departureDate={monthYearString}-01&departureAirportCode={airport}&duration={travelDuration}&catalogueItemId={hotel.HotelId}&departureDateRange=31&paxAges={paxAges}";
             var response = await httpClient.GetAsync(url);
             if (response.IsSuccessStatusCode)
             {
-                var data = await response.Content.ReadFromJsonAsync<List<TravelPriceDto>>();
-                if (data != null && data.Count > 0)
+                var data = await response.Content.ReadFromJsonAsync<DepartureDatesDto>();
+                if (data != null && data.DepartureDates != null && data.DepartureDates.Count > 0)
                 {
-                    var travels = data
-                        .Where(d => !d.IsSoldOut && d.CheapestPrice != null)
+                    var travels = data.DepartureDates
+                        .Where(d => !d.IsSoldOut && d.Price != null)
                         .Select(travelPriceDto => new TravelPrice(
                             travelPriceDto.Date,
-                            travelPriceDto.CheapestPrice,
+                            travelPriceDto.Price,
                             airport,
                             travelDuration,
                             hotel.DisplayName,
@@ -128,19 +133,24 @@ namespace CheapPlayitasApi
                     travels.Clear(); // Remove existing travels, since they are either 21, 28 or both.
                     foreach (var travel in travelsAt21Days)
                     {
-                        var flightsUrl = $"https://www.apollorejser.dk/api/Flight/Flights?productCategoryCode=FlightAndHotel&DepartureAirportCode={airport}&DepartureDate={travel.Date:yyyy-MM-dd}&duration=21&HotelId={hotel.HotelIdString}&PaxAges={paxAges}";
+                        var flightsUrl = $"https://prod-bookingguide.apollotravelgroup.com/api/2.0/apollorejserdk/Core/AccommodationSearch?accommodationCode={hotel.AccommodationCode}&departureAirportCode={airport}&departureDate={travel.Date:yyyy-MM-dd}&duration=21&paxAges={paxAges}";
                         var flightsResponse = await httpClient.GetAsync(flightsUrl);
-                        var flightsData = await flightsResponse.Content.ReadFromJsonAsync<FLights>();
-                        if (flightsData != null && flightsData.FlightPackages.Count > 0)
+                        var accommodationSearch = await flightsResponse.Content.ReadFromJsonAsync<AccommodationSearchDto>();
+                        var alternativeDurationProductUrl =
+                            $"https://prod-bookingguide.apollotravelgroup.com/api/2.0/apollorejserdk/Core/AlternativeDurationProducts?productId={accommodationSearch.ProductId}&paxAges=18,18";
+                        var alternativeDurationProductResponse = await httpClient.GetAsync(alternativeDurationProductUrl);
+                        var alternativeDurationProducts = await alternativeDurationProductResponse.Content.ReadFromJsonAsync<List<AlternativeDurationProduct>>();
+                        if (alternativeDurationProducts != null && alternativeDurationProducts.Count > 0)
                         {
-                            foreach (var flight in flightsData.FlightPackages)
+                            foreach (var flight in alternativeDurationProducts)
                             {
+                                if(flight.Duration < 21) { continue; }
                                 travels.Add(
                                     new TravelPrice(
                                         travel.Date,
-                                        flight.CheapestProductPrice,
+                                        flight.Price,
                                         airport,
-                                        flight.DurationInDays.ToString(),
+                                        flight.Duration.ToString(),
                                         hotel.DisplayName,
                                         HotelLink(hotel.HotelUrl, travel.Date, airport, travelDuration, hotel.HotelId, paxAges)
                                     )
@@ -186,8 +196,8 @@ namespace CheapPlayitasApi
         {
             var hotels = new List<Hotel>
             {
-                new Hotel("Playitas Annexe (Fuerteventura - Spanien)", "530116", "PLXPLA", "spanien/de-kanariske-oer/fuerteventura/playitas-resort/hoteller/playitas-annexe"),
-                new Hotel("Playitas Resort (Fuerteventura - Spanien)", "160759", "PLYBAH", "spanien/de-kanariske-oer/fuerteventura/playitas-resort/hoteller/playitas-resort"),
+                new Hotel("Playitas Annexe (Fuerteventura - Spanien)", "530116", "PLXPLA", "ESPLYPLA01", "spanien/de-kanariske-oer/fuerteventura/playitas-resort/hoteller/playitas-annexe"),
+                new Hotel("Playitas Resort (Fuerteventura - Spanien)", "160759", "PLYBAH", "ESPLYBAH01", "spanien/de-kanariske-oer/fuerteventura/playitas-resort/hoteller/playitas-resort"),
                 //new Hotel("La Pared (Fuerteventura - Spanien)", "537065", "COSLAP", "spanien/de-kanariske-oer/fuerteventura/costa-calma-tarajalejo-og-la-pared/hoteller/la-pared---powered-by-playitas"),
                 //new Hotel("Porto Myrina (Limnos - Grækenland)", "158862", "MYNPPB", "graekenland/limnos/hoteller/porto-myrina---powered-by-playitas"),
                 //new Hotel("Levante (Rhodos - Grækenland)", "165291", "AFNLEV", "graekenland/rhodos/afandou-og-kolymbia/hoteller/levante---powered-by-playitas"),
@@ -200,21 +210,33 @@ namespace CheapPlayitasApi
             return hotels;
         }
     }
-    public record TravelPriceDto(DateTime Date, bool IsSoldOut, decimal? CheapestPrice);
 
-    public record Hotel(string DisplayName, string HotelId, string HotelIdString, string HotelUrl);
+    public record DepartureDatesDto(List<TravelPriceDto>? DepartureDates);
+    
+    public record TravelPriceDto(DateTime Date, bool IsSoldOut, decimal? Price);
+
+    public record Hotel(string DisplayName, string HotelId, string HotelIdString, string AccommodationCode, string HotelUrl);
 
     public record TravelPrice(DateTime Date, decimal? Price, string Airport, string Duration, string Hotel, string Link);
+    
+    
+    public record AlternativeDurationProduct(string DepartureDate, int Duration, decimal Price);
 
+    //
+    // public record FlightPackage
+    // {
+    //     public int DurationInDays { get; init; }
+    //     public decimal CheapestProductPrice { get; init; }
+    // }
 
-    public record FlightPackage
-    {
-        public int DurationInDays { get; init; }
-        public decimal CheapestProductPrice { get; init; }
-    }
+    public record FlightSearchDto(
+        FlightPackage FlightPackage,
+        decimal Price
+    );
 
-    public record FLights
-    {
-        public List<FlightPackage> FlightPackages { get; init; }
-    }
+    public record FlightPackage(
+        int DurationInDays
+    );
+
+    public record AccommodationSearchDto(string ProductId);
 }
