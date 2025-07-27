@@ -11,8 +11,6 @@ namespace CheapPlayitasApi
 
         public static async Task Main(string[] args)
         {
-            ServicePointManager.DefaultConnectionLimit = 30;
-
             var builder = WebApplication.CreateBuilder(args);
             ConfigureServices(builder);
 
@@ -31,7 +29,14 @@ namespace CheapPlayitasApi
         {
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
-            builder.Services.AddHttpClient();
+            builder.Services.AddHttpClient(Microsoft.Extensions.Options.Options.DefaultName, client =>
+            {
+                client.DefaultRequestHeaders.ConnectionClose = false;
+            }).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                MaxConnectionsPerServer = 30,
+                PooledConnectionLifetime = TimeSpan.FromMinutes(10)
+            });
             builder.Services.AddMemoryCache();
 
             builder.Services.AddCors(options =>
@@ -58,14 +63,16 @@ namespace CheapPlayitasApi
             {
                 Console.WriteLine($"Starting request to prices {DateTime.Now}");
 
-                int persons = context.Request.Query.TryGetValue("persons", out var personsValue) ? int.Parse(personsValue) : 2;
+                int persons = context.Request.Query.TryGetValue("persons", out var personsValue) && !string.IsNullOrEmpty(personsValue.ToString()) 
+                    ? int.Parse(personsValue.ToString()) 
+                    : 2;
                 string cacheKey = $"PricesCache{persons}";
 
                 var prices = await cache.GetOrCreateAsync(cacheKey, async entry =>
                 {
                     entry.SetAbsoluteExpiration(TimeSpan.FromHours(20));
                     return await GetHotelsAndPricesAsync(httpClient, persons);
-                });
+                }) ?? new List<TravelPrice>();
 
                 if (prices.Count == 0)
                 {
@@ -183,8 +190,9 @@ namespace CheapPlayitasApi
             if (!flightsResponse.IsSuccessStatusCode) return null;
 
             var accommodationSearch = await flightsResponse.Content.ReadFromJsonAsync<AccommodationSearchResponse>();
-            if (accommodationSearch != null && accommodationSearch.HotelStay.Stay != int.Parse(duration)) return null; 
-            return accommodationSearch?.ProductId;
+            if (accommodationSearch == null || string.IsNullOrEmpty(accommodationSearch.ProductId)) return null;
+            if (accommodationSearch.HotelStay?.Stay != int.Parse(duration)) return null;
+            return accommodationSearch.ProductId;
         }
 
         private static async Task<List<TravelPrice>> Handle21And28DayTravelAsync(
@@ -277,11 +285,25 @@ namespace CheapPlayitasApi
     public record TravelPrice(DateTime Date, decimal Price, string Airport, string Duration, string Hotel, string Link);
 
     public record AlternativeDurationProductResponse(string DepartureDate, int Duration, decimal Price);
-    public record AccommodationSearchResponse(string ProductId, HotelStay HotelStay);
+    public record AccommodationSearchResponse(string ProductId, HotelStay HotelStay)
+    {
+        public AccommodationSearchResponse() : this(string.Empty, new HotelStay(0)) { }
+    }
 
-    public record HotelStay(int Stay);
-    public record DepartureDatesResponse(List<TravelPriceResponse> DepartureDates);
-    public record TravelPriceResponse(DateTime Date, bool IsSoldOut, decimal? Price);
+    public record HotelStay(int Stay)
+    {
+        public HotelStay() : this(0) { }
+    }
+    
+    public record DepartureDatesResponse(List<TravelPriceResponse> DepartureDates)
+    {
+        public DepartureDatesResponse() : this(new List<TravelPriceResponse>()) { }
+    }
+    
+    public record TravelPriceResponse(DateTime Date, bool IsSoldOut, decimal? Price)
+    {
+        public TravelPriceResponse() : this(DateTime.MinValue, false, null) { }
+    };
 
 
     public static class Duration
