@@ -101,8 +101,10 @@ namespace CheapPlayitasApi
             ).ToList());
             
             // Debug line
-            // tasks.Add(GetPricesForHotelsAsync(httpClient, Duration.OneWeek, hotels, "CPH", "2025-01", paxAges));
-                
+            // tasks.Add(GetPricesForHotelsAsync(httpClient, Duration.OneWeek, hotels, "CPH", "2025-11", paxAges));
+            // tasks.Add(GetPricesForHotelsAsync(httpClient, Duration.TwoWeeks, hotels, "CPH", "2025-11", paxAges));
+            // tasks.Add(GetPricesForHotelsAsync(httpClient, Duration.MoreThanTwoWeeks, hotels, "CPH", "2025-11", paxAges));
+            
             var results = await Task.WhenAll(tasks);
 
             foreach (var result in results)
@@ -131,61 +133,88 @@ namespace CheapPlayitasApi
 
             if (data?.DepartureDates == null || data.DepartureDates.Count == 0) return new List<TravelPrice>();
 
-            var travels = data.DepartureDates
-                .Where(d => !d.IsSoldOut && d.Price.HasValue)
-                .Select(travelPriceDto => new TravelPrice(
-                    travelPriceDto.Date,
-                    travelPriceDto.Price ?? 0,
-                    airport,
-                    travelDuration,
-                    hotel.DisplayName,
-                    HotelLink(hotel.HotelUrl, travelPriceDto.Date, airport, travelDuration, hotel.HotelId, paxAges)))
-                .ToList();
-
-            if (travelDuration == Duration.MoreThanTwoWeeks)
+            var travels = new List<TravelPrice>();
+            
+            foreach (var departure in data.DepartureDates.Where(d => !d.IsSoldOut && d.Price.HasValue))
             {
-                travels = await Handle21And28DayTravelAsync(httpClient, travels, hotel, airport, paxAges);
+                if (travelDuration == Duration.MoreThanTwoWeeks)
+                {
+                    var longDurationTravels = await Handle21And28DayTravelAsync(
+                        httpClient, 
+                        hotel, 
+                        departure.Date,
+                        departure.Price ?? 0,
+                        airport, 
+                        paxAges);
+
+                    travels.AddRange(longDurationTravels);
+                }
+                else
+                {
+                    var productId = await GetProductIdAsync(httpClient, hotel, departure.Date, airport, travelDuration, paxAges);
+                    if (productId != null)
+                    {
+                        travels.Add(new TravelPrice(
+                            departure.Date,
+                            departure.Price ?? 0,
+                            airport,
+                            travelDuration,
+                            hotel.DisplayName,
+                            HotelLink(hotel.HotelUrl, departure.Date, airport, travelDuration, hotel.HotelId, paxAges, productId)));
+                    }
+                }
             }
 
             return travels;
         }
 
-        private static async Task<List<TravelPrice>> Handle21And28DayTravelAsync(HttpClient httpClient, List<TravelPrice> travels, Hotel hotel, string airport, string paxAges)
+
+        private static async Task<string?> GetProductIdAsync(
+            HttpClient httpClient,
+            Hotel hotel,
+            DateTime departureDate,
+            string airport,
+            string duration,
+            string paxAges)
         {
-            var updatedTravels = new List<TravelPrice>();
+            var flightsUrl = $"{ApolloApiBasePath}/api/2.0/{SalesUnit}/Core/AccommodationSearch?accommodationCode={hotel.AccommodationCode}&departureAirportCode={airport}&departureDate={departureDate:yyyy-MM-dd}&duration={duration}&paxAges={paxAges}";
+            var flightsResponse = await httpClient.GetAsync(flightsUrl);
 
-            foreach (var travel in travels)
+            if (!flightsResponse.IsSuccessStatusCode) return null;
+
+            var accommodationSearch = await flightsResponse.Content.ReadFromJsonAsync<AccommodationSearchResponse>();
+            if (accommodationSearch != null && accommodationSearch.HotelStay.Stay != int.Parse(duration)) return null; 
+            return accommodationSearch?.ProductId;
+        }
+
+        private static async Task<List<TravelPrice>> Handle21And28DayTravelAsync(
+            HttpClient httpClient,
+            Hotel hotel,
+            DateTime departureDate,
+            decimal basePrice,
+            string airport,
+            string paxAges)
+        {
+            var travels = new List<TravelPrice>();
+            var durations = new[] { "21", "28" };
+
+            foreach (var duration in durations)
             {
-                var flightsUrl = $"{ApolloApiBasePath}/api/2.0/{SalesUnit}/Core/AccommodationSearch?accommodationCode={hotel.AccommodationCode}&departureAirportCode={airport}&departureDate={travel.Date:yyyy-MM-dd}&duration=21&paxAges={paxAges}";
-                var flightsResponse = await httpClient.GetAsync(flightsUrl);
-
-                if (!flightsResponse.IsSuccessStatusCode) continue;
-
-                var accommodationSearch = await flightsResponse.Content.ReadFromJsonAsync<AccommodationSearchResponse>();
-                if (accommodationSearch == null) continue;
-
-                var alternativeDurationProductUrl = $"{ApolloApiBasePath}/api/2.0/{SalesUnit}/Core/AlternativeDurationProducts?productId={accommodationSearch.ProductId}&paxAges={paxAges}";
-                var alternativeDurationProductResponse = await httpClient.GetAsync(alternativeDurationProductUrl);
-
-                if (!alternativeDurationProductResponse.IsSuccessStatusCode) continue;
-
-                var alternativeDurationProducts = await alternativeDurationProductResponse.Content.ReadFromJsonAsync<List<AlternativeDurationProductResponse>>();
-                if (alternativeDurationProducts == null || alternativeDurationProducts.Count == 0) continue;
-
-                foreach (var product in alternativeDurationProducts.Where(x => x.Duration >= 21))
+                var productId = await GetProductIdAsync(httpClient, hotel, departureDate, airport, duration, paxAges);
+                if (productId != null)
                 {
-                    updatedTravels.Add(new TravelPrice(
-                        travel.Date,
-                        product.Price,
+                    travels.Add(new TravelPrice(
+                        departureDate,
+                        basePrice,
                         airport,
-                        product.Duration.ToString(),
+                        duration,
                         hotel.DisplayName,
-                        HotelLink(hotel.HotelUrl, travel.Date, airport, product.Duration.ToString(), hotel.HotelId, paxAges)
+                        HotelLink(hotel.HotelUrl, departureDate, airport, duration, hotel.HotelId, paxAges, productId)
                     ));
                 }
             }
 
-            return updatedTravels;
+            return travels;
         }
 
         private static List<string> GetMonthYearStrings()
@@ -205,9 +234,29 @@ namespace CheapPlayitasApi
             return monthYearStrings;
         }
 
-        private static string HotelLink(string hotelUrl, DateTime date, string airport, string duration, string hotelId, string paxAges)
+        private static string HotelLink(string hotelUrl, DateTime date, string airport, string duration, string hotelId, string paxAges, string productId)
         {
-            return $"https://www.apollorejser.dk/{hotelUrl}?departureDate={date:yyyy-MM-dd}&departureAirportCode={airport}&duration={duration}&catalogueItemId={hotelId}&departureDateRange=31&paxAges={paxAges}";
+            // Return empty string if any required parameter is missing
+            if (string.IsNullOrWhiteSpace(airport) || 
+                string.IsNullOrWhiteSpace(duration) || 
+                string.IsNullOrWhiteSpace(hotelId) || 
+                string.IsNullOrWhiteSpace(paxAges) ||
+                string.IsNullOrWhiteSpace(productId))
+            {
+                return string.Empty;
+            }
+
+            var accommodationUri = $"der:accommodation:dtno:{hotelId}";
+            return "https://www.apollorejser.dk/booking-guide/core/select-unit-and-meal" +
+                   $"?departureAirportCode={Uri.EscapeDataString(airport)}" +
+                   $"&paxAges={Uri.EscapeDataString(paxAges)}" +
+                   $"&searchProductCategoryCodes=FlightAndHotel" +
+                   $"&searchProductCategoryCodes=Cruise" +
+                   $"&departureDate={date:yyyy-MM-dd}" +
+                   $"&duration={Uri.EscapeDataString(duration)}" +
+                   $"&accommodationUri={Uri.EscapeDataString(accommodationUri)}" +
+                   $"&searchType=Cached" +
+                   $"&productId={Uri.EscapeDataString(productId)}";
         }
 
         private static List<Hotel> GetHotelList()
@@ -228,7 +277,9 @@ namespace CheapPlayitasApi
     public record TravelPrice(DateTime Date, decimal Price, string Airport, string Duration, string Hotel, string Link);
 
     public record AlternativeDurationProductResponse(string DepartureDate, int Duration, decimal Price);
-    public record AccommodationSearchResponse(string ProductId);
+    public record AccommodationSearchResponse(string ProductId, HotelStay HotelStay);
+
+    public record HotelStay(int Stay);
     public record DepartureDatesResponse(List<TravelPriceResponse> DepartureDates);
     public record TravelPriceResponse(DateTime Date, bool IsSoldOut, decimal? Price);
 
