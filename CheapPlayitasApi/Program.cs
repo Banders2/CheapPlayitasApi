@@ -122,7 +122,7 @@ namespace CheapPlayitasApi
 
         private static async Task<List<TravelPrice>> GetPricesForHotelAndAirportAsync(HttpClient httpClient, string travelDuration, Hotel hotel, string airport, string monthYearString, string paxAges)
         {
-            var url = $"{ApolloApiBasePath}/api/2.0/{SalesUnit}/SearchBox/DepartureDates?productTypeCodes=FlightAndHotel&accommodationCode={hotel.AccommodationCode}&departureDate={monthYearString}-01&departureAirportCode={airport}&duration={travelDuration}&catalogueItemId={hotel.HotelId}&departureDateRange=31&paxAges={paxAges}";
+            var url = $"{ApolloApiBasePath}/api/3/{SalesUnit}/accommodation-uri/{hotel.AccommodationUri}/accommodation-code/{hotel.AccommodationCode}/departure-dates-for-accommodation?accommodationUri={hotel.AccommodationUri}&accommodationCode={hotel.AccommodationCode}&departureAirportCode={airport}&departureDate={monthYearString}-01&departureDateRange=31&duration={travelDuration}&productTypeCodes=FlightAndHotel&productTypeCodes=Cruise&paxAges={paxAges}&paxConfig=";
             var response = await httpClient.GetAsync(url);
 
             if (!response.IsSuccessStatusCode) return new List<TravelPrice>();
@@ -221,7 +221,10 @@ namespace CheapPlayitasApi
     }
 
 
-    public record Hotel(string DisplayName, string HotelId, string AccommodationCode, string HotelUrl);
+    public record Hotel(string DisplayName, string HotelId, string AccommodationCode, string HotelUrl)
+    {
+        public string AccommodationUri => $"der:accommodation:dtno:{HotelId}";
+    }
     public record TravelPrice(DateTime Date, decimal Price, string Airport, string Duration, string Hotel, string Link);
 
     public record AlternativeDurationProductResponse(string DepartureDate, int Duration, decimal Price);
