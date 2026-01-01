@@ -6,7 +6,8 @@ namespace CheapPlayitasApi
 
     public class Program
     {
-        private const string ApolloApiBasePath = "https://prod-bookingguide.apollotravelgroup.com";
+        // https://booking-guide-bff.prod.dertouristiknordic.com/swagger/index.html
+        private const string ApolloApiBasePath = "https://booking-guide-bff.prod.dertouristiknordic.com";
         private const string SalesUnit = "apollorejserdk";
 
         public static async Task Main(string[] args)
@@ -106,7 +107,7 @@ namespace CheapPlayitasApi
                     )
                 )
             ).ToList());
-            
+
             // Debug line
             // tasks.Add(GetPricesForHotelsAsync(httpClient, Duration.OneWeek, hotels, "CPH", "2025-11", paxAges));
             // tasks.Add(GetPricesForHotelsAsync(httpClient, Duration.TwoWeeks, hotels, "CPH", "2025-11", paxAges));
